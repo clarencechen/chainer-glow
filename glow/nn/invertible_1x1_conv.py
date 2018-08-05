@@ -78,7 +78,7 @@ class LUInvertible1x1Conv(chainer.Chain):
         # w_l: a lower triangular matrix with ones on the diagonal
         # w_u: an upper triangular matrix with zeros on the diagonal,
         w_p, w_l, w_u = scipy.linalg.lu(rotation_mat)
-        s = np.diag(w_u)
+        s = cf.diagonal(w_u)
         u_mask = np.triu(np.ones_like(w_u), k=1)
         l_mask = np.tril(np.ones_like(w_u), k=-1)
         l_diag = np.eye(w_l.shape[0])
@@ -107,7 +107,7 @@ class LUInvertible1x1Conv(chainer.Chain):
     @property
     def W(self):
         kernel = self.w_p @ (self.w_l * self.l_mask + self.l_diag) @ (
-            self.w_u * self.u_mask + np.diag(self.s))
+            self.w_u * self.u_mask + cf.diagonal(self.s))
         return cf.reshape(kernel, kernel.shape + (1, 1))
 
     def forward_step(self, x):
