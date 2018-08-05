@@ -107,7 +107,7 @@ class LUInvertible1x1Conv(chainer.Chain):
     @property
     def W(self):
         kernel = self.w_p @ (self.w_l * self.l_mask + self.l_diag) @ (
-            self.w_u * self.u_mask + diag(self.s))
+            self.w_u * self.u_mask + np.diag(self.s))
         return cf.reshape(kernel, kernel.shape + (1, 1))
 
     def forward_step(self, x):
