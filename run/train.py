@@ -128,13 +128,19 @@ def main():
     x_mean = np.mean(images)
     x_var = np.var(images)
 
-    dataset = glow.dataset.Dataset(images)
-    iterator = glow.dataset.Iterator(dataset, batch_size=args.batch_size)
+    last_train_image = int((1 -args.validate_split) * len(images))
+
+    train_dataset = glow.dataset.Dataset(images[:last_train_image])
+    val_dataset = glow.dataset.Dataset(images[last_train_image:])
+    
+    train_iterator = glow.dataset.Iterator(train_dataset, batch_size=args.batch_size)
+    val_iterator = glow.dataset.Iterator(val_dataset, batch_size=args.batch_size)
 
     print(tabulate([
-        ["#", len(dataset)],
-        ["mean", x_mean],
-        ["var", x_var],
+        ["# train samples", len(train_dataset)],
+        ["# validate samples", len(val_dataset)],
+        ["overall mean", x_mean],
+        ["overall var", x_var],
     ]))
 
     hyperparams = Hyperparameters()
@@ -156,8 +162,8 @@ def main():
 
     # Data dependent initialization
     if encoder.need_initialize:
-        for batch_index, data_indices in enumerate(iterator):
-            x = to_gpu(dataset[data_indices])
+        for batch_index, data_indices in enumerate(train_iterator):
+            x = to_gpu(train_dataset[data_indices])
             encoder.initialize_actnorm_weights(x)
             break
 
@@ -166,13 +172,14 @@ def main():
 
     # Training loop
     for iteration in range(args.total_iteration):
+        # Training step
         sum_loss = 0
         sum_nll = 0
         sum_kld = 0
         start_time = time.time()
 
-        for batch_index, data_indices in enumerate(iterator):
-            x = to_gpu(dataset[data_indices])
+        for batch_index, data_indices in enumerate(train_iterator):
+            x = to_gpu(train_dataset[data_indices])
             x += xp.random.uniform(0, 1.0 / num_bins_x, size=x.shape)
 
             denom = math.log(2.0) * num_pixels
@@ -200,24 +207,62 @@ def main():
             sum_loss += _float(loss)
             sum_nll += _float(negative_log_likelihood) / args.batch_size
             sum_kld += _float(kld) / args.batch_size
-            if (batch_index + 1) % 100 == 0:
+            if (batch_index + 1) % 500 == 0:
                 print(
-                    "Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
+                    "Training Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
                     format(
-                        iteration + 1, batch_index + 1, len(iterator),
+                        iteration + 1, batch_index + 1, len(train_iterator),
                         _float(loss),
                         _float(negative_log_likelihood) / args.batch_size,
                         _float(kld) / args.batch_size,
                         _float(logdet)))
-                
-                encoder.save(args.snapshot_path)
 
-        mean_log_likelihood = -sum_nll / len(iterator)
-        mean_kld = sum_kld / len(iterator)
+                encoder.save(args.snapshot_path)
+        # Validation Step
+        sum_loss = 0
+        sum_nll = 0
+        sum_kld = 0
+
+        with chainer.no_backprop_mode():
+            for batch_index, data_indices in enumerate(val_iterator):
+                x = to_gpu(val_dataset[data_indices])
+                x += xp.random.uniform(0, 1.0 / num_bins_x, size=x.shape)
+
+                denom = math.log(2.0) * num_pixels
+
+                factorized_z_distribution, logdet = encoder.forward_step(x)
+
+                logdet -= math.log(num_bins_x) * num_pixels
+
+                kld = 0
+                negative_log_likelihood = 0
+                for (zi, mean, ln_var) in factorized_z_distribution:
+                    negative_log_likelihood += cf.gaussian_nll(zi, mean, ln_var)
+                    if args.regularize_z:
+                        kld += cf.gaussian_kl_divergence(mean, ln_var)
+                loss = (negative_log_likelihood + kld) / args.batch_size - logdet
+                loss = loss / denom
+
+                sum_loss += _float(loss)
+                sum_nll += _float(negative_log_likelihood) / args.batch_size
+                sum_kld += _float(kld) / args.batch_size
+                if (batch_index + 1) % 100 == 0:
+                    print(
+                        "Validation of Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
+                        format(
+                            iteration + 1, batch_index + 1, len(val_iterator),
+                            _float(loss),
+                            _float(negative_log_likelihood) / args.batch_size,
+                            _float(kld) / args.batch_size,
+                            _float(logdet)))
+
+        # Summary stats for iteration
+        mean_log_likelihood = -sum_nll / len(val_iterator)
+        mean_kld = sum_kld / len(val_iterator)
         elapsed_time = time.time() - start_time
         print(
-            "\033[2KIteration {} - loss: {:.5f} - log_likelihood: {:.5f} - kld: {:.5f} - elapsed_time: {:.3f} min".
-            format(iteration + 1, sum_loss / len(iterator), mean_log_likelihood,
+            "\033[2KIteration {} - validation loss: {:.5f} - test log_likelihood: {:.5f} - test kld: {:.5f} - elapsed_time: {:.3f} min".
+            format(iteration + 1, sum_loss / len(val_iterator), mean_log_likelihood,
                    mean_kld, elapsed_time / 60))
         encoder.save(args.snapshot_path)
 
@@ -228,6 +273,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset-format", "-ext", type=str, required=True)
     parser.add_argument(
         "--snapshot-path", "-snapshot", type=str, default="snapshot")
+    parser.add_argument("--validate-split", "-v", type=float, default=0.2)
     parser.add_argument("--batch-size", "-b", type=int, default=32)
     parser.add_argument("--gpu-device", "-gpu", type=int, default=0)
     parser.add_argument("--total-iteration", "-iter", type=int, default=1000)
