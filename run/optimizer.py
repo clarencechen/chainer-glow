@@ -8,9 +8,9 @@ class Optimizer:
             self,
             model_parameters,
             # Learning rate at training step s with annealing
-            mu_i=1.0 * 1e-2,
+            mu_i=3.0 * 1e-3,
             mu_f=1.0 * 1e-4,
-            n=5000,
+            n=1000,
             # Learning rate as used by the Adam algorithm
             beta_1=0.9,
             beta_2=0.99,
@@ -33,10 +33,14 @@ class Optimizer:
         return self.optimizer.alpha
 
     def mu_s(self, training_step):
-        return max(
-            self.mu_f +
-            (self.mu_i - self.mu_f) * (1.0 - training_step / self.n),
-            self.mu_f)
+        # Cyclical Learning Rate
+        step_in_cycle_num = training_step % self.n
+        if step_in_cycle_num < self.n / 2:
+            # Increase LR
+            return self.mu_f + (self.mu_i - self.mu_f) * 2.0 * (step_in_cycle_num / self.n)
+        else:
+            # Decrease LR
+            return self.mu_f + (self.mu_i - self.mu_f) * 2.0 * (1.0 - step_in_cycle_num / self.n)
 
     def anneal_learning_rate(self, training_step):
         self.optimizer.hyperparam.alpha = self.mu_s(training_step)
