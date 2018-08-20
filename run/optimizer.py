@@ -10,7 +10,7 @@ class Optimizer:
             # Learning rate at training step s with annealing
             mu_i=3.0 * 1e-3,
             mu_f=1.0 * 1e-4,
-            n=1000,
+            n=5000,
             # Learning rate as used by the Adam algorithm
             beta_1=0.9,
             beta_2=0.99,
