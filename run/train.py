@@ -200,16 +200,16 @@ def main():
             sum_loss += _float(loss)
             sum_nll += _float(negative_log_likelihood) / args.batch_size
             sum_kld += _float(kld) / args.batch_size
-            print(
-                "Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
-                format(
-                    iteration + 1, batch_index + 1, len(iterator),
-                    _float(loss),
-                    _float(negative_log_likelihood) / args.batch_size / denom,
-                    _float(kld) / args.batch_size,
-                    _float(logdet) / denom))
-
             if (batch_index + 1) % 100 == 0:
+                print(
+                    "Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
+                    format(
+                        iteration + 1, batch_index + 1, len(iterator),
+                        _float(loss),
+                        _float(negative_log_likelihood) / args.batch_size,
+                        _float(kld) / args.batch_size,
+                        _float(logdet)))
+                
                 encoder.save(args.snapshot_path)
 
         mean_log_likelihood = -sum_nll / len(iterator)
