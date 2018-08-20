@@ -215,6 +215,7 @@ def main():
         mean_log_likelihood = -sum_nll / len(iterator)
         mean_kld = sum_kld / len(iterator)
         elapsed_time = time.time() - start_time
+        sys.stdout.flush()
         print(
             "\033[2KIteration {} - loss: {:.5f} - log_likelihood: {:.5f} - kld: {:.5f} - elapsed_time: {:.3f} min".
             format(iteration + 1, sum_loss / len(iterator), mean_log_likelihood,
