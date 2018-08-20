@@ -207,7 +207,7 @@ def main():
             sum_loss += _float(loss)
             sum_nll += _float(negative_log_likelihood) / args.batch_size
             sum_kld += _float(kld) / args.batch_size
-            if (batch_index + 1) % 500 == 0:
+            if (batch_index + 1) % 200 == 0:
                 print(
                     "Training Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
                     format(
@@ -218,10 +218,19 @@ def main():
                         _float(logdet)))
 
                 encoder.save(args.snapshot_path)
+        mean_log_likelihood = -sum_nll / len(train_iterator)
+        mean_kld = sum_kld / len(train_iterator)
+        elapsed_time = time.time() - start_time
+        print(
+            "\033[2KIteration {} Summary - training loss: {:.5f} - train log_likelihood: {:.5f} - train kld: {:.5f} - elapsed_time: {:.3f} min".
+            format(iteration + 1, sum_loss / len(train_iterator), mean_log_likelihood,
+                   mean_kld, elapsed_time / 60))
+        
         # Validation Step
         sum_loss = 0
         sum_nll = 0
         sum_kld = 0
+        start_time = time.time()
 
         with chainer.no_backprop_mode():
             for batch_index, data_indices in enumerate(val_iterator):
@@ -246,22 +255,13 @@ def main():
                 sum_loss += _float(loss)
                 sum_nll += _float(negative_log_likelihood) / args.batch_size
                 sum_kld += _float(kld) / args.batch_size
-                if (batch_index + 1) % 100 == 0:
-                    print(
-                        "Validation of Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
-                        format(
-                            iteration + 1, batch_index + 1, len(val_iterator),
-                            _float(loss),
-                            _float(negative_log_likelihood) / args.batch_size,
-                            _float(kld) / args.batch_size,
-                            _float(logdet)))
 
         # Summary stats for iteration
         mean_log_likelihood = -sum_nll / len(val_iterator)
         mean_kld = sum_kld / len(val_iterator)
         elapsed_time = time.time() - start_time
         print(
-            "\033[2KIteration {} - validation loss: {:.5f} - test log_likelihood: {:.5f} - test kld: {:.5f} - elapsed_time: {:.3f} min".
+            "\033[2KIteration {} Summary - validation loss: {:.5f} - test log_likelihood: {:.5f} - test kld: {:.5f} - elapsed_time: {:.3f} min".
             format(iteration + 1, sum_loss / len(val_iterator), mean_log_likelihood,
                    mean_kld, elapsed_time / 60))
         encoder.save(args.snapshot_path)
