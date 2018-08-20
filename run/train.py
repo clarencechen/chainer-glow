@@ -200,7 +200,7 @@ def main():
             sum_loss += _float(loss)
             sum_nll += _float(negative_log_likelihood) / args.batch_size
             sum_kld += _float(kld) / args.batch_size
-            printr(
+            print(
                 "Iteration {}: Batch {} / {} - loss: {:.8f} - nll: {:.8f} - kld: {:.8f} - log_det: {:.8f}".
                 format(
                     iteration + 1, batch_index + 1, len(iterator),
@@ -215,7 +215,6 @@ def main():
         mean_log_likelihood = -sum_nll / len(iterator)
         mean_kld = sum_kld / len(iterator)
         elapsed_time = time.time() - start_time
-        sys.stdout.flush()
         print(
             "\033[2KIteration {} - loss: {:.5f} - log_likelihood: {:.5f} - kld: {:.5f} - elapsed_time: {:.3f} min".
             format(iteration + 1, sum_loss / len(iterator), mean_log_likelihood,
